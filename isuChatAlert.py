@@ -20,6 +20,7 @@ author_bold_2 = 0
 display_timer = 0.0
 current_max_time = 5.0 
 is_alert_active = False
+is_test_mode = False 
 KEYWORDS = []
 FADE_TIME = 0.5 
 player_name = ""
@@ -35,6 +36,7 @@ lbl_time = 0
 lbl_mention = 0
 txt_keywords = 0
 btn_save = 0
+btn_test = 0 
 save_feedback_timer = 0.0
 
 # --- DEFAULT SETTINGS ---
@@ -45,7 +47,6 @@ SET_MENTION_ME = True
 SET_OPACITY = 0.85
 SET_BASE_TIME = 3.0
 
-# Color Palette (Name, R, G, B) - Orange is Default (Index 0)
 COLORS = [
     ("Orange", 1.0, 0.55, 0.0),
     ("Red", 1.0, 0.1, 0.1),
@@ -81,7 +82,6 @@ def save_settings(*args):
         with open(settings_file, 'w', encoding='utf-8') as f:
             parser.write(f)
             
-        # SAVE FEEDBACK ANIMATION
         ac.setText(btn_save, "SAVED SUCCESSFULLY!")
         save_feedback_timer = 2.0
     except:
@@ -185,6 +185,18 @@ def btn_mention_toggle(x, y):
     SET_MENTION_ME = not SET_MENTION_ME
     update_config_labels()
 
+def toggle_test_mode(x, y):
+    global is_test_mode, is_alert_active, display_timer, btn_test, FADE_TIME, appWindow
+    is_test_mode = not is_test_mode
+    if is_test_mode:
+        ac.setText(btn_test, "STOP TEST MODE")
+        ac.setTitle(appWindow, "IsuChat (Drag Me)") # Taşımak için başlığı görünür yapıyoruz!
+        trigger_app_intro()
+    else:
+        ac.setText(btn_test, "TEST / MOVE MODE")
+        ac.setTitle(appWindow, "") # Taşıma bitince tekrar ninja gibi gizliyoruz!
+        display_timer = FADE_TIME 
+
 # --- MAIN APP LOGIC ---
 def wrap_text(text, max_chars=36):
     words = text.split(' ')
@@ -234,8 +246,9 @@ def wake_up_window(box_height):
     ac.setPosition(author_bold_2, pad_x, pad_y)
 
 def sleep_mode():
-    global appWindow, bg_box, accent_line, chat_label, author_bold_1, author_bold_2
-    ac.setTitle(appWindow, "") 
+    global appWindow, bg_box, accent_line, chat_label, author_bold_1, author_bold_2, is_test_mode
+    if not is_test_mode:
+        ac.setTitle(appWindow, "") 
     ac.setSize(appWindow, 1, 1)
     ac.setBackgroundOpacity(bg_box, 0.0)
     ac.setBackgroundOpacity(accent_line, 0.0)
@@ -247,8 +260,6 @@ def sleep_mode():
 
 def trigger_app_intro():
     global display_timer, is_alert_active, chat_label, author_bold_1, author_bold_2, appWindow, current_max_time, sound_file, SET_SOUND
-    
-    ac.setTitle(appWindow, "") 
     
     safe_author = "IsuChat :"
     message = "App is active! You can drag and pin me anywhere on the screen."
@@ -275,11 +286,15 @@ def trigger_app_intro():
             pass
 
 def on_app_activated(*args):
-    trigger_app_intro()
+    if not is_test_mode:
+        trigger_app_intro()
 
 def on_chat_message(message, author):
     global display_timer, is_alert_active, chat_label, author_bold_1, author_bold_2, appWindow, current_max_time, sound_file, SET_SOUND, SET_BASE_TIME, player_name, SET_MENTION_ME
     
+    if is_test_mode:
+        return
+
     if not player_name:
         try:
             player_name = ac.getDriverName(0)
@@ -295,13 +310,11 @@ def on_chat_message(message, author):
             matched = True
             break
             
-    # Senpai test edebilsin diye yazar kontrolünü kaldırdım!
     if not matched and SET_MENTION_ME and player_name:
         if player_name.lower() in msg_lower:
             matched = True
 
     if matched:
-        ac.setTitle(appWindow, "") 
         
         safe_author = author[:15] + " :"
         full_message = "{} {}".format(safe_author, message)
@@ -330,19 +343,18 @@ def on_chat_message(message, author):
 
 def acMain(ac_version):
     global appWindow, cfgWindow, bg_box, accent_line, chat_label, author_bold_1, author_bold_2
-    global lbl_text_size, lbl_color, lbl_sound, lbl_mention, lbl_scale, lbl_opacity, lbl_time, txt_keywords, btn_save
+    global lbl_text_size, lbl_color, lbl_sound, lbl_mention, lbl_scale, lbl_opacity, lbl_time, txt_keywords, btn_save, btn_test
     
     load_settings()
     
-    # ---------------------------------------------
-    # 1. APP: ISUCHAT ALERT (MAIN)
-    # ---------------------------------------------
     appWindow = ac.newApp("IsuChatAlert")
     ac.setSize(appWindow, 700, 200) 
     ac.drawBorder(appWindow, 0)
     ac.drawBackground(appWindow, 0)
     ac.setBackgroundOpacity(appWindow, 0.0)
-    ac.setTitle(appWindow, "IsuChat (Drag Me)") 
+    
+    # SENPAI İÇİN YENİ BÜYÜ: Oyun ekranını temiz tutmak için başlangıçta başlığı tamamen siliyoruz!
+    ac.setTitle(appWindow, "") 
     ac.setIconPosition(appWindow, -9999, -9999)
     
     bg_box = ac.addLabel(appWindow, "")
@@ -359,11 +371,9 @@ def acMain(ac_version):
     ac.addOnChatMessageListener(appWindow, on_chat_message)
     ac.addOnAppActivatedListener(appWindow, on_app_activated)
     
-    # ---------------------------------------------
-    # 2. APP: ISUCHAT CONFIG (SETTINGS)
-    # ---------------------------------------------
+    # --- 2. APP: ISUCHAT CONFIG ---
     cfgWindow = ac.newApp("IsuChat Config")
-    ac.setSize(cfgWindow, 300, 460) 
+    ac.setSize(cfgWindow, 300, 490) 
     
     btn_t_minus = ac.addButton(cfgWindow, "-")
     ac.setPosition(btn_t_minus, 20, 40)
@@ -438,19 +448,21 @@ def acMain(ac_version):
     ac.setSize(btn_men, 80, 30)
     ac.addOnClickedListener(btn_men, btn_mention_toggle)
     
-    lbl_mention = ac.addLabel(cfgWindow, "Mention Alert: ")
-    ac.setPosition(lbl_mention, 110, 285)
+    btn_test = ac.addButton(cfgWindow, "TEST / MOVE MODE")
+    ac.setPosition(btn_test, 20, 320)
+    ac.setSize(btn_test, 260, 30)
+    ac.addOnClickedListener(btn_test, toggle_test_mode)
     
     lbl_kw = ac.addLabel(cfgWindow, "Keywords (comma separated):")
-    ac.setPosition(lbl_kw, 20, 330)
+    ac.setPosition(lbl_kw, 20, 360) 
     
     txt_keywords = ac.addTextInput(cfgWindow, "txt_kw")
-    ac.setPosition(txt_keywords, 20, 355)
+    ac.setPosition(txt_keywords, 20, 385) 
     ac.setSize(txt_keywords, 260, 30)
     ac.setText(txt_keywords, ",".join(KEYWORDS))
     
     btn_save = ac.addButton(cfgWindow, "SAVE SETTINGS")
-    ac.setPosition(btn_save, 20, 400)
+    ac.setPosition(btn_save, 20, 430) 
     ac.setSize(btn_save, 260, 40)
     ac.addOnClickedListener(btn_save, save_settings)
     
@@ -460,8 +472,7 @@ def acMain(ac_version):
 
 def acUpdate(deltaT):
     global display_timer, is_alert_active, bg_box, accent_line, chat_label, author_bold_1, author_bold_2, current_max_time
-    global save_feedback_timer, btn_save, SET_OPACITY
-    FADE_TIME = 0.5
+    global save_feedback_timer, btn_save, SET_OPACITY, is_test_mode, FADE_TIME
     
     if save_feedback_timer > 0:
         save_feedback_timer -= deltaT
@@ -469,13 +480,20 @@ def acUpdate(deltaT):
             ac.setText(btn_save, "SAVE SETTINGS")
             
     if is_alert_active:
-        display_timer -= deltaT
         current_opacity = 1.0
         
-        if display_timer > (current_max_time - FADE_TIME):
-            current_opacity = (current_max_time - display_timer) / FADE_TIME
-        elif display_timer < FADE_TIME:
-            current_opacity = max(0.0, display_timer / FADE_TIME)
+        if not is_test_mode:
+            display_timer -= deltaT
+            
+            # Sadece normal moddayken fade animasyonu hesapla
+            if display_timer > (current_max_time - FADE_TIME):
+                current_opacity = (current_max_time - display_timer) / FADE_TIME
+            elif display_timer < FADE_TIME:
+                current_opacity = max(0.0, display_timer / FADE_TIME)
+        else:
+            # TEST MODUNDAYKEN HEP %100 GÖRÜNÜR OLACAK SENPAI!
+            current_opacity = 1.0
+            display_timer = current_max_time # Kapanmaması için süreyi donduruyoruz
             
         ac.setBackgroundOpacity(bg_box, current_opacity * SET_OPACITY) 
         ac.setBackgroundOpacity(accent_line, current_opacity)   
@@ -484,12 +502,14 @@ def acUpdate(deltaT):
         ac.setFontColor(author_bold_1, 1.0, 1.0, 1.0, current_opacity) 
         ac.setFontColor(author_bold_2, 1.0, 1.0, 1.0, current_opacity) 
         
-        if display_timer <= 0:
+        if display_timer <= 0 and not is_test_mode:
             ac.setText(chat_label, "")
             ac.setText(author_bold_1, "")
             ac.setText(author_bold_2, "")
             sleep_mode() 
             is_alert_active = False
-
+            
 def acShutdown():
-    pass
+    global appWindow
+    # EN ÖNEMLİ KISIM: Assetto Corsa kapanırken pencere pozisyonunu kaydetsin diye saniyelik olarak başlığı geri veriyoruz!
+    ac.setTitle(appWindow, "IsuChatAlert")
